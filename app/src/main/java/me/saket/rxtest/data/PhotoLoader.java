@@ -53,28 +53,23 @@ public class PhotoLoader {
             Log.d(TAG, "Loading image Url: " + imageUrl);
 
             // Plan A: Check in memory
-            if (mMemoryCache.containsKey(imageUrl)) {
-                Log.i(TAG, "Loading from memory cache");
-                return loadFromCache(imageUrl, mMemoryCache);
-            }
+            final Observable<Bitmap> memoryCacheLoadObs = loadFromCache(imageUrl, mMemoryCache);
 
             // Plan B: Look into files
-            if (mDiskCache.containsKey(imageUrl)) {
-                Log.i(TAG, "Loading from disk cache");
-                final Observable<Bitmap> diskImageObservable = loadFromCache(imageUrl, mDiskCache);
-
-                // Place this Bitmap in memory cache for future use
-                diskImageObservable.doOnNext(saveToCache(imageUrl, mMemoryCache));
-                return diskImageObservable;
-            }
+            final Observable<Bitmap> diskImageObservable = loadFromCache(imageUrl, mDiskCache)
+                    .doOnNext(saveToCache(imageUrl, mMemoryCache));
 
             // Plan C: Hit the network
-            Log.i(TAG, "Downloading from the internet");
-            return mNetworkClient
+            final Observable<Bitmap> networkLoadObs = mNetworkClient
                     .loadImage(imageUrl)
-                     // Save into both memory and disk cache for future calls
+                    // Save into both memory and disk cache for future calls
                     .doOnNext(saveToCache(imageUrl, mMemoryCache))
-                    .doOnNext(saveToCache(imageUrl, mDiskCache));
+                    .doOnNext(saveToCache(imageUrl, mDiskCache))
+                    .doOnNext(bitmap -> {
+                        Log.i(TAG, "Loading from: Internet");
+                    });
+
+            return Observable.amb(memoryCacheLoadObs, diskImageObservable, networkLoadObs);
         };
     }
 
@@ -84,12 +79,17 @@ public class PhotoLoader {
                 return;
             }
 
-            Log.i(TAG, "Saving to " + bitmapCache.getName());
+            Log.i(TAG, "Saving to: " + bitmapCache.getName());
             bitmapCache.save(imageUrl, bitmap);
         };
     }
 
     private Observable<Bitmap> loadFromCache(String imageUrl, BitmapCache whichBitmapCache) {
+        if (!whichBitmapCache.containsKey(imageUrl)) {
+            return Observable.never();
+        }
+
+        Log.i(TAG, "Loading from: " + whichBitmapCache.getName());
         final Bitmap imageBitmap = whichBitmapCache.get(imageUrl);
         return Observable.just(imageBitmap);
     }

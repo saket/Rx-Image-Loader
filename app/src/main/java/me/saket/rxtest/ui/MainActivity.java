@@ -44,7 +44,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        mImageLoadSubscription.unsubscribe();
+        if (mImageLoadSubscription != null) {
+            mImageLoadSubscription.unsubscribe();
+        }
     }
 
     @OnClick(R.id.btn_download_image)
@@ -54,7 +56,7 @@ public class MainActivity extends AppCompatActivity {
         mImageView.setImageBitmap(null);
 
         // Cancel any ongoing load
-        if (mImageLoadSubscription != null && !mImageLoadSubscription.isUnsubscribed()) {
+        if (mImageLoadSubscription != null) {
             mImageLoadSubscription.unsubscribe();
         }
 
@@ -67,17 +69,17 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onNext(Bitmap bitmap) {
                         mImageView.setImageBitmap(bitmap);
-                        mImageLoadSubscription.unsubscribe();
                     }
 
                     @Override
                     public void onError(Throwable e) {
                         handleImageDownloadError(e);
+                        mImageLoadSubscription.unsubscribe();
                     }
 
                     @Override
                     public void onCompleted() {
-
+                        mImageLoadSubscription.unsubscribe();
                     }
                 });
     }
