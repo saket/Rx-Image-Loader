@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">RxTest</string>
+
+    <string-array name="image_urls">
+        <item>http://c8.staticflickr.com/9/8077/8333965143_3c99edac2b_c.jpg</item>
+        <item>http://c3.staticflickr.com/9/8496/8334946250_bc42ce31a8_k.jpg</item>
+        <item>http://c5.staticflickr.com/9/8073/8306494596_3455d43835_c.jpg</item>
+        <item>http://c4.staticflickr.com/9/8359/8328512995_1f43d7d76a.jpg</item>
+        <item>http://c3.staticflickr.com/6/5326/9422960994_a1a3d15ee9.jpg</item>
+    </string-array>
+</resources>

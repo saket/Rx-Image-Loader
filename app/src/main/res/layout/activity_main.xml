@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="@dimen/activity_vertical_margin"
+    tools:context=".ui.MainActivity"
+    >
+
+    <!-- Image Url field -->
+    <Spinner
+        android:id="@+id/spinner_image_url"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Hello World!"
+        android:entries="@array/image_urls"
+        />
+
+    <RelativeLayout
+        android:id="@+id/download_btn_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:animateLayoutChanges="true"
+        android:layout_below="@+id/spinner_image_url"
+        >
+
+        <!-- Download progress indicator -->
+        <ProgressBar
+            android:id="@+id/load_progress_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            />
+
+        <!-- Submit button -->
+        <Button
+            android:id="@+id/btn_download_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Download"
+            android:layout_toStartOf="@+id/btn_clear_cache"
+            />
+
+        <Button
+            android:id="@+id/btn_clear_cache"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:text="Clear cache"
+            android:layout_alignParentEnd="true"
+            />
+
+    </RelativeLayout>
+
+    <!-- The ImageView where the Url is downloaded onto -->
+    <ImageView
+        android:id="@+id/imageview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/download_btn_container"
+        android:layout_marginTop="16dp"
+        />
+
+</RelativeLayout>
