@@ -15,13 +15,15 @@ import rx.functions.Func1;
 public class PhotoLoader {
 
     private static final String TAG = "Photos";
-    private static PhotoLoader sPhotoLoader;
+    private static final Object LOCK = new Object();
+    private static volatile PhotoLoader sPhotoLoader;
 
     private final MemoryBitmapCache mMemoryCache;
     private final DiskBitmapCache mDiskCache;
     private NetworkClient mNetworkClient;
 
-    public PhotoLoader(MemoryBitmapCache memoryCache, DiskBitmapCache diskCache, NetworkClient networkClient) {
+    public PhotoLoader(MemoryBitmapCache memoryCache, DiskBitmapCache diskCache,
+                       NetworkClient networkClient) {
         mMemoryCache = memoryCache;
         mDiskCache = diskCache;
         mNetworkClient = networkClient;
@@ -29,11 +31,18 @@ public class PhotoLoader {
 
     public static PhotoLoader getInstance(Context context) {
         if (sPhotoLoader == null) {
-            sPhotoLoader = new PhotoLoader(
-                    MemoryBitmapCache.getInstance(),
-                    DiskBitmapCache.getInstance(context),
-                    NetworkClient.getInstance()
-            );
+            synchronized (LOCK) {
+                // Another null check is required if a 2nd thread manages to get
+                // queued for this synchronized block while the 1st thread was
+                // already executing inside this block, instantiating the object.
+                if (sPhotoLoader == null) {
+                    sPhotoLoader = new PhotoLoader(
+                            MemoryBitmapCache.getInstance(),
+                            DiskBitmapCache.getInstance(context),
+                            NetworkClient.getInstance()
+                    );
+                }
+            }
         }
         return sPhotoLoader;
     }

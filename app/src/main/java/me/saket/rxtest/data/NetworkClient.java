@@ -13,24 +13,15 @@ import rx.Observable;
  */
 public class NetworkClient {
 
-    private static NetworkClient sNetworkClient;
+    private static final NetworkClient NETWORK_CLIENT = new NetworkClient();
     private final OkHttpClient mOkHttpClient;
-
-    /**
-     * Maximum time to wait before giving up (for connecting to a
-     * server as well as waiting for its response).
-     */
-    long TIMEOUT_DELAY_SECS = 60;   // 60s
 
     public NetworkClient() {
         mOkHttpClient = new OkHttpClient();
     }
 
     public static NetworkClient getInstance() {
-        if (sNetworkClient == null) {
-            sNetworkClient = new NetworkClient();
-        }
-        return sNetworkClient;
+        return NETWORK_CLIENT;
     }
 
     /**
