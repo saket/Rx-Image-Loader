@@ -65,20 +65,27 @@ public class PhotoLoader {
             final Observable<Bitmap> memoryCacheLoadObs = loadFromCache(imageUrl, mMemoryCache);
 
             // Plan B: Look into files
+            // (And save into memory cache)
             final Observable<Bitmap> diskImageObservable = loadFromCache(imageUrl, mDiskCache)
                     .doOnNext(saveToCache(imageUrl, mMemoryCache));
 
             // Plan C: Hit the network
-            final Observable<Bitmap> networkLoadObs = mNetworkClient
-                    .loadImage(imageUrl)
-                    // Save into both memory and disk cache for future calls
-                    .doOnNext(saveToCache(imageUrl, mMemoryCache))
-                    .doOnNext(saveToCache(imageUrl, mDiskCache))
-                    .doOnNext(bitmap -> {
-                        Log.i(TAG, "Loading from: Internet");
-                    });
+            // (And save into both memory and disk cache for future calls)
+            final Observable<Bitmap> networkLoadObs = Observable.defer(() -> {
+                Log.i(TAG, "Downloading from the Internet");
+                return mNetworkClient
+                        .loadImage(imageUrl)
+                        .doOnNext(saveToCache(imageUrl, mMemoryCache))
+                        .doOnNext(saveToCache(imageUrl, mDiskCache));
+            });
 
-            return Observable.amb(memoryCacheLoadObs, diskImageObservable, networkLoadObs);
+            return Observable
+                    .concat(memoryCacheLoadObs, diskImageObservable, networkLoadObs)
+                     // Calling first() will stop the stream as soon as one item is emitted.
+                     // This way, the cheapest source (memory) gets to emit first and the
+                     // most expensive source (network) is only reached when no other source
+                     // could emit any cached Bitmap.
+                    .first(cachedBitmap -> cachedBitmap != null);
         };
     }
 
@@ -93,16 +100,35 @@ public class PhotoLoader {
         };
     }
 
+    /**
+     * Returns a stream of the cached bitmap in <var>whichBitmapCache</var>.
+     * The emitted item can be null if this cache source does not have anything to offer.
+     */
     private Observable<Bitmap> loadFromCache(String imageUrl, BitmapCache whichBitmapCache) {
-        if (!whichBitmapCache.containsKey(imageUrl)) {
-            return Observable.never();
-        }
-
-        Log.i(TAG, "Loading from: " + whichBitmapCache.getName());
         final Bitmap imageBitmap = whichBitmapCache.get(imageUrl);
-        return Observable.just(imageBitmap);
+        return Observable
+                .just(imageBitmap)
+                .compose(logCacheSource(whichBitmapCache));
     }
 
+    /**
+     * Simple logging to let us know what each source is returning
+     */
+    private Observable.Transformer<Bitmap, Bitmap> logCacheSource(BitmapCache whichBitmapCache) {
+        return dataObservable -> dataObservable.doOnNext(cachedBitmap -> {
+            final String cacheName = whichBitmapCache.getName();
+            Log.i(TAG, "Checking: " + cacheName);
+            if (cachedBitmap == null) {
+                Log.i(TAG, "Does not have this Url");
+            } else {
+                Log.i(TAG, "Url found in cache!");
+            }
+        });
+    }
+
+    /**
+     * Deletes all cached Bitmaps in both memory and disk cache.
+     */
     public void clearCache() {
         mDiskCache.clear();
         mMemoryCache.clear();
