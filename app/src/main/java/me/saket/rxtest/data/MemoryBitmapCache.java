@@ -5,6 +5,7 @@ import android.util.LruCache;
 
 /**
  * Holds objects temporarily — until the app gets killed.
+ * The methods of this Cache are thread safe.
  */
 public class MemoryBitmapCache implements BitmapCache {
 
@@ -14,14 +15,11 @@ public class MemoryBitmapCache implements BitmapCache {
     public static final int CACHE_SIZE_BYTES
             = (int) (Runtime.getRuntime().maxMemory() / 1024 / 2000);
 
-    private LruCache<String, Bitmap> mCache = new LruCache<>(CACHE_SIZE_BYTES);
-    private static MemoryBitmapCache sMemoryCache;
+    private final LruCache<String, Bitmap> mCache = new LruCache<>(CACHE_SIZE_BYTES);
+    private static final MemoryBitmapCache MEMORY_BITMAP_CACHE = new MemoryBitmapCache();
 
     public static MemoryBitmapCache getInstance() {
-        if (sMemoryCache == null) {
-            sMemoryCache = new MemoryBitmapCache();
-        }
-        return sMemoryCache;
+        return MEMORY_BITMAP_CACHE;
     }
 
     @Override
@@ -31,7 +29,10 @@ public class MemoryBitmapCache implements BitmapCache {
 
     @Override
     public boolean containsKey(String key) {
-        return mCache.get(key) != null;
+        synchronized (mCache) {
+            final Bitmap existingBitmap = get(key);
+            return existingBitmap != null;
+        }
     }
 
     @Override

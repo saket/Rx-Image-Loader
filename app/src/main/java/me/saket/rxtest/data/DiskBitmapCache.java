@@ -18,19 +18,27 @@ import java.net.URLEncoder;
  */
 public class DiskBitmapCache implements BitmapCache {
 
-    private static final String TAG = "DiskCache";
-    private static DiskBitmapCache sDiskCache;
-    private File mCacheDirectory;
+    private static final Object LOCK = new Object();
+    private static volatile DiskBitmapCache sDiskCache;
 
-    public static DiskBitmapCache getInstance(Context context) {
-        if (sDiskCache == null) {
-            sDiskCache = new DiskBitmapCache(context);
-        }
-        return sDiskCache;
-    }
+    private final File mCacheDirectory;
 
     public DiskBitmapCache(Context context) {
         mCacheDirectory = context.getCacheDir();
+    }
+
+    public static DiskBitmapCache getInstance(Context context) {
+        if (sDiskCache == null) {
+            synchronized (LOCK) {
+                // Another null check is required if a 2nd thread manages to get
+                // queued for this synchronized block while the 1st thread was
+                // already executing inside this block, instantiating the object.
+                if (sDiskCache == null) {
+                    sDiskCache = new DiskBitmapCache(context);
+                }
+            }
+        }
+        return sDiskCache;
     }
 
     @Override
@@ -40,23 +48,28 @@ public class DiskBitmapCache implements BitmapCache {
 
     @Override
     public boolean containsKey(String key) {
-        return get(key) != null;
+        synchronized (mCacheDirectory) {
+            final Bitmap existingBitmap = get(key);
+            return existingBitmap != null;
+        }
     }
 
     @Override
     public Bitmap get(@NonNull String key) {
-        final String cacheFileName = encodeKey(key);
-        final File[] foundCacheFiles = mCacheDirectory.listFiles((dir, filename) -> {
-            return filename.equals(cacheFileName);
-        });
+        synchronized (mCacheDirectory) {
+            final String cacheFileName = encodeKey(key);
+            final File[] foundCacheFiles = mCacheDirectory.listFiles((dir, filename) -> {
+                return filename.equals(cacheFileName);
+            });
 
-        if (foundCacheFiles == null || foundCacheFiles.length < 1) {
-            // No cached object found for this key
-            return null;
+            if (foundCacheFiles == null || foundCacheFiles.length < 1) {
+                // No cached object found for this key
+                return null;
+            }
+
+            // Read and return its contents
+            return readBitmapFromFile(foundCacheFiles[0]);
         }
-
-        // Read and return its contents
-        return readBitmapFromFile(foundCacheFiles[0]);
     }
 
     @Override
@@ -70,16 +83,20 @@ public class DiskBitmapCache implements BitmapCache {
 
         } catch (java.io.IOException e) {
             e.printStackTrace();
-
         }
     }
 
     @Override
     public void clear() {
-        for (final File cacheFile : mCacheDirectory.listFiles()) {
-            cacheFile.delete();
+        synchronized (mCacheDirectory) {
+            final File[] cachedFiles = mCacheDirectory.listFiles();
+            if (cachedFiles != null) {
+                for (final File cacheFile : cachedFiles) {
+                    cacheFile.delete();
+                }
+            }
+            mCacheDirectory.delete();
         }
-        mCacheDirectory.delete();
     }
 
 // ======== UTILITY ======== //
