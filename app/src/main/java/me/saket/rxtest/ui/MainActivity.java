@@ -53,7 +53,6 @@ public class MainActivity extends AppCompatActivity {
     void onDownloadButtonClick() {
         // Start progress indicator
         setProgressBarVisible(true);
-        mImageView.setImageBitmap(null);
 
         // Cancel any ongoing load
         if (mImageLoadSubscription != null) {
