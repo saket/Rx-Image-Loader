@@ -53,28 +53,29 @@ public class PhotoLoader {
      * 2. Disk cache   — if it was ever downloaded
      * 3. Network      — if it was never downloaded
      */
-    public Observable<Bitmap> load(String imageUrl) {
+    public Observable<Image> load(String imageUrl) {
         return Observable.just(imageUrl).flatMap(findImageSource());
     }
 
-    private Func1<String, Observable<Bitmap>> findImageSource() {
+    private Func1<String, Observable<Image>> findImageSource() {
         return imageUrl -> {
             Log.d(TAG, "Loading image Url: " + imageUrl);
 
             // Plan A: Check in memory
-            final Observable<Bitmap> memoryCacheLoadObs = loadFromCache(imageUrl, mMemoryCache);
+            final Observable<Image> memoryCacheLoadObs = loadFromCache(imageUrl, mMemoryCache);
 
             // Plan B: Look into files
             // (And save into memory cache)
-            final Observable<Bitmap> diskImageObservable = loadFromCache(imageUrl, mDiskCache)
+            final Observable<Image> diskImageObservable = loadFromCache(imageUrl, mDiskCache)
                     .doOnNext(saveToCache(imageUrl, mMemoryCache));
 
             // Plan C: Hit the network
             // (And save into both memory and disk cache for future calls)
-            final Observable<Bitmap> networkLoadObs = Observable.defer(() -> {
+            final Observable<Image> networkLoadObs = Observable.defer(() -> {
                 Log.i(TAG, "Downloading from the Internet");
                 return mNetworkClient
                         .loadImage(imageUrl)
+                        .map(bitmap -> new Image(bitmap, Image.Source.NETWORK))
                         .doOnNext(saveToCache(imageUrl, mMemoryCache))
                         .doOnNext(saveToCache(imageUrl, mDiskCache));
             });
@@ -84,19 +85,19 @@ public class PhotoLoader {
                      // Calling first() will stop the stream as soon as one item is emitted.
                      // This way, the cheapest source (memory) gets to emit first and the
                      // most expensive source (network) is only reached when no other source
-                     // could emit any cached Bitmap.
-                    .first(cachedBitmap -> cachedBitmap != null);
+                     // could emit any cached image.
+                    .first(cachedImage -> cachedImage != null);
         };
     }
 
-    private Action1<Bitmap> saveToCache(String imageUrl, BitmapCache bitmapCache) {
-        return bitmap -> {
-            if (bitmap == null) {
+    private Action1<Image> saveToCache(String imageUrl, BitmapCache bitmapCache) {
+        return image -> {
+            if (image == null) {
                 return;
             }
 
             Log.i(TAG, "Saving to: " + bitmapCache.getName());
-            bitmapCache.save(imageUrl, bitmap);
+            bitmapCache.save(imageUrl, image.bitmap);
         };
     }
 
@@ -104,11 +105,12 @@ public class PhotoLoader {
      * Returns a stream of the cached bitmap in <var>whichBitmapCache</var>.
      * The emitted item can be null if this cache source does not have anything to offer.
      */
-    private Observable<Bitmap> loadFromCache(String imageUrl, BitmapCache whichBitmapCache) {
-        final Bitmap imageBitmap = whichBitmapCache.get(imageUrl);
+    private Observable<Image> loadFromCache(String imageUrl, BitmapCache whichBitmapCache) {
         return Observable
-                .just(imageBitmap)
-                .compose(logCacheSource(whichBitmapCache));
+                .just(whichBitmapCache.get(imageUrl))
+                .filter(bitmap -> bitmap != null)
+                .compose(logCacheSource(whichBitmapCache))
+                .map(bitmap -> new Image(bitmap, whichBitmapCache.getSource()));
     }
 
     /**
