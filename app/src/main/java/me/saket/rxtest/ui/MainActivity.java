@@ -1,10 +1,10 @@
 package me.saket.rxtest.ui;
 
-import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -16,6 +16,7 @@ import butterknife.ButterKnife;
 import butterknife.OnClick;
 import me.saket.rxtest.R;
 import me.saket.rxtest.data.PhotoLoader;
+import me.saket.rxtest.data.SourceIdentifiableDrawable;
 import rx.Observable;
 import rx.Subscriber;
 import rx.Subscription;
@@ -24,6 +25,8 @@ import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final String TAG = "MainActivity";
 
     @Bind(R.id.spinner_image_url) Spinner mImageUrlSpinner;
     @Bind(R.id.imageview) ImageView mImageView;
@@ -64,10 +67,11 @@ public class MainActivity extends AppCompatActivity {
                 .flatMap(loadImageBitmapFromUrl())
                 .compose(applySchedulers())
                 .doOnEach(notif -> setProgressBarVisible(false))
-                .subscribe(new Subscriber<Bitmap>() {
+                .subscribe(new Subscriber<SourceIdentifiableDrawable>() {
                     @Override
-                    public void onNext(Bitmap bitmap) {
-                        mImageView.setImageBitmap(bitmap);
+                    public void onNext(SourceIdentifiableDrawable drawable) {
+                        Log.d(TAG, "Image fetched from: " + drawable.getImageSource());
+                        mImageView.setImageDrawable(drawable);
                     }
 
                     @Override
@@ -98,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @NonNull
-    private Func1<String, Observable<? extends Bitmap>> loadImageBitmapFromUrl() {
+    private Func1<String, Observable<SourceIdentifiableDrawable>> loadImageBitmapFromUrl() {
         return imageUrl -> mPhotoLoader.load(imageUrl);
     }
 

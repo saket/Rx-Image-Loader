@@ -2,6 +2,7 @@ package me.saket.rxtest.data;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
 import android.util.Log;
 
 import rx.Observable;
@@ -53,28 +54,31 @@ public class PhotoLoader {
      * 2. Disk cache   — if it was ever downloaded
      * 3. Network      — if it was never downloaded
      */
-    public Observable<Bitmap> load(String imageUrl) {
+    public Observable<SourceIdentifiableDrawable> load(String imageUrl) {
         return Observable.just(imageUrl).flatMap(findImageSource());
     }
 
-    private Func1<String, Observable<Bitmap>> findImageSource() {
+    private Func1<String, Observable<SourceIdentifiableDrawable>> findImageSource() {
         return imageUrl -> {
             Log.d(TAG, "Loading image Url: " + imageUrl);
 
             // Plan A: Check in memory
-            final Observable<Bitmap> memoryCacheLoadObs = loadFromCache(imageUrl, mMemoryCache);
+            final Observable<SourceIdentifiableDrawable> memoryCacheLoadObs
+                    = loadFromCache(imageUrl, mMemoryCache);
 
             // Plan B: Look into files
             // (And save into memory cache)
-            final Observable<Bitmap> diskImageObservable = loadFromCache(imageUrl, mDiskCache)
-                    .doOnNext(saveToCache(imageUrl, mMemoryCache));
+            final Observable<SourceIdentifiableDrawable> diskImageObservable
+                    = loadFromCache(imageUrl, mDiskCache)
+                      .doOnNext(saveToCache(imageUrl, mMemoryCache));
 
             // Plan C: Hit the network
             // (And save into both memory and disk cache for future calls)
-            final Observable<Bitmap> networkLoadObs = Observable.defer(() -> {
+            final Observable<SourceIdentifiableDrawable> networkLoadObs = Observable.defer(() -> {
                 Log.i(TAG, "Downloading from the Internet");
                 return mNetworkClient
                         .loadImage(imageUrl)
+                        .map(bitmap -> new SourceIdentifiableDrawable(bitmap, ImageSource.NETWORK))
                         .doOnNext(saveToCache(imageUrl, mMemoryCache))
                         .doOnNext(saveToCache(imageUrl, mDiskCache));
             });
@@ -84,19 +88,19 @@ public class PhotoLoader {
                      // Calling first() will stop the stream as soon as one item is emitted.
                      // This way, the cheapest source (memory) gets to emit first and the
                      // most expensive source (network) is only reached when no other source
-                     // could emit any cached Bitmap.
-                    .first(cachedBitmap -> cachedBitmap != null);
+                     // could emit any cached image.
+                    .first(cachedImage -> cachedImage != null);
         };
     }
 
-    private Action1<Bitmap> saveToCache(String imageUrl, BitmapCache bitmapCache) {
-        return bitmap -> {
-            if (bitmap == null) {
+    private Action1<BitmapDrawable> saveToCache(String imageUrl, BitmapCache bitmapCache) {
+        return image -> {
+            if (image == null) {
                 return;
             }
 
             Log.i(TAG, "Saving to: " + bitmapCache.getName());
-            bitmapCache.save(imageUrl, bitmap);
+            bitmapCache.save(imageUrl, image.getBitmap());
         };
     }
 
@@ -104,18 +108,22 @@ public class PhotoLoader {
      * Returns a stream of the cached bitmap in <var>whichBitmapCache</var>.
      * The emitted item can be null if this cache source does not have anything to offer.
      */
-    private Observable<Bitmap> loadFromCache(String imageUrl, BitmapCache whichBitmapCache) {
-        final Bitmap imageBitmap = whichBitmapCache.get(imageUrl);
+    private Observable<SourceIdentifiableDrawable> loadFromCache(String imageUrl,
+                                                                 BitmapCache whichBitmapCache) {
         return Observable
-                .just(imageBitmap)
-                .compose(logCacheSource(whichBitmapCache));
+                .just(whichBitmapCache.get(imageUrl))
+                .filter(bitmap -> bitmap != null)
+                .compose(logCacheSource(whichBitmapCache))
+                .map(bitmap ->
+                    new SourceIdentifiableDrawable(bitmap, whichBitmapCache.getSource())
+                );
     }
 
     /**
      * Simple logging to let us know what each source is returning
      */
     private Observable.Transformer<Bitmap, Bitmap> logCacheSource(BitmapCache whichBitmapCache) {
-        return dataObservable -> dataObservable.doOnNext(cachedBitmap -> {
+        return imageObservable -> imageObservable.doOnNext(cachedBitmap -> {
             final String cacheName = whichBitmapCache.getName();
             Log.i(TAG, "Checking: " + cacheName);
             if (cachedBitmap == null) {

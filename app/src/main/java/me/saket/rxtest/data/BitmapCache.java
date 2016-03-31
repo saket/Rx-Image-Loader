@@ -14,6 +14,11 @@ public interface BitmapCache {
     String getName();
 
     /**
+     * Returns the source of this cache.
+     */
+    ImageSource getSource();
+
+    /**
      * Whether any object with <var>key</var> exists
      */
     boolean containsKey(String key);

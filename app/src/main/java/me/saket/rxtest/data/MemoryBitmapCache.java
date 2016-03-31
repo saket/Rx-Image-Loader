@@ -28,6 +28,11 @@ public class MemoryBitmapCache implements BitmapCache {
     }
 
     @Override
+    public ImageSource getSource() {
+        return ImageSource.MEMORY;
+    }
+
+    @Override
     public boolean containsKey(String key) {
         synchronized (mCache) {
             final Bitmap existingBitmap = get(key);
