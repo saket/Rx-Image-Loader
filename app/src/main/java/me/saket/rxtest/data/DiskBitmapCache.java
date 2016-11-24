@@ -47,6 +47,11 @@ public class DiskBitmapCache implements BitmapCache {
     }
 
     @Override
+    public Image.Source getSource() {
+        return Image.Source.DISK;
+    }
+
+    @Override
     public boolean containsKey(String key) {
         synchronized (mCacheDirectory) {
             final Bitmap existingBitmap = get(key);
